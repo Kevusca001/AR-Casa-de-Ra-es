@@ -1,0 +1,66 @@
+
+import React from 'react';
+import { Product } from '../types';
+
+interface ProductCardProps {
+  product: Product;
+}
+
+const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+  return (
+    <div className="bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all border border-gray-100 flex flex-col group h-full relative">
+      <div className="relative aspect-square overflow-hidden bg-gray-50 flex items-center justify-center">
+        <img 
+          src={product.image_url} 
+          alt={product.name} 
+          className="w-full h-full object-contain p-6 group-hover:scale-110 transition-transform duration-700"
+        />
+        
+        {/* Badges Flutuantes */}
+        <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
+          {product.tag && (
+            <div className="bg-pet-red text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-xl shadow-lg border border-white/20">
+              {product.tag}
+            </div>
+          )}
+          <div className="bg-royal-blue/90 backdrop-blur-sm text-white text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest w-fit">
+            {product.category}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6 flex flex-col flex-grow">
+        <div className="mb-4">
+          <span className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">{product.brand}</span>
+          <h4 className="text-xl font-black text-royal-blue mt-1 leading-tight group-hover:text-pet-red transition-colors uppercase tracking-tighter">
+            {product.name}
+          </h4>
+        </div>
+
+        <p className="text-sm text-gray-500 mb-6 flex-grow line-clamp-2 font-medium leading-relaxed">
+          {product.description}
+        </p>
+        
+        <div className="flex items-end justify-between mt-auto">
+          <div className="flex flex-col">
+            {product.weight && (
+              <span className="text-[10px] font-bold text-gray-400 mb-1 flex items-center gap-1 uppercase tracking-widest">
+                <i className="fas fa-weight-hanging text-xs"></i> {product.weight}
+              </span>
+            )}
+            <div className="bg-vibrant-yellow px-4 py-2 rounded-2xl shadow-sm border border-black/5">
+              <span className="text-royal-blue text-[11px] font-black mr-1 uppercase opacity-60">R$</span>
+              <span className="text-royal-blue text-2xl font-black tracking-tighter">
+                {product.price > 0 ? product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '---'}
+              </span>
+            </div>
+          </div>
+          
+          {/* O botão de adicionar é gerenciado pelo componente pai ProductCatalog via position:absolute para melhor UX */}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProductCard;
