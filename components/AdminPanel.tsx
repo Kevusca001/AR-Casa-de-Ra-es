@@ -2,21 +2,29 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../mockService';
 import { Product } from '../types';
+import { supabase } from '../supabaseClient';
 
 interface AdminPanelProps {
   onBack: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // --- Estados de Autenticação ---
+  const [user, setUser] = useState<any>(null);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+
+  // --- Estados do Dashboard ---
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(true);
-  
+  const [fetchLoading, setFetchLoading] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   
-  // Form State
+  // --- Estados do Formulário ---
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [price, setPrice] = useState('');
@@ -26,7 +34,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+      } catch (err) {
+        console.error("Erro na sessão:", err);
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (!session) {
+        setProducts([]);
+        resetForm();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const fetchProducts = async () => {
+    if (!user) return;
     setFetchLoading(true);
     try {
       const data = await mockService.getProducts();
@@ -39,15 +73,64 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (user) {
       fetchProducts();
     }
-  }, [isAuthenticated]);
+  }, [user]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'admin123') setIsAuthenticated(true);
-    else alert('Senha incorreta!');
+    setAuthError(null);
+    setAuthLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('E-mail ou senha incorretos.');
+        }
+        throw error;
+      }
+    } catch (err: any) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setName('');
+    setBrand('');
+    setPrice('');
+    setCategory('Cachorro');
+    setDescription('');
+    setWeight('');
+    setImagePreview(null);
+    setSelectedFile(null);
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+  };
+
+  const startEdit = (product: Product) => {
+    setEditingId(product.id);
+    setName(product.name);
+    setBrand(product.brand);
+    setPrice(product.price.toString().replace('.', ','));
+    setCategory(product.category);
+    setDescription(product.description);
+    setWeight(product.weight || '');
+    setImagePreview(product.image_url);
+    setSelectedFile(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,21 +142,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       }
       setSelectedFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
+      reader.onloadend = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
   const handleSave = async () => {
     if (!name || !price || (!imagePreview && !selectedFile)) {
-      return alert('Preencha: Nome, Preço e selecione uma Foto.');
+      return alert('Preencha Nome, Preço e selecione uma Foto.');
     }
     
     setLoading(true);
     try {
       await mockService.saveProduct({
+        id: editingId || undefined,
         name,
         brand,
         description,
@@ -84,16 +166,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       }, selectedFile || undefined);
 
       await fetchProducts();
-      
-      // Reset Form
-      setName(''); setPrice(''); setBrand(''); setDescription(''); setWeight(''); 
-      setImagePreview(null); setSelectedFile(null);
-      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
-      
-      alert('Produto cadastrado com sucesso!');
-    } catch (err) {
-      alert('Falha ao salvar no Supabase.');
+      resetForm();
+      alert(editingId ? 'Produto atualizado!' : 'Produto cadastrado!');
+    } catch (err: any) {
+      alert(err.message || 'Erro ao salvar. Verifique sua conexão ou permissões.');
     } finally {
       setLoading(false);
     }
@@ -106,40 +182,76 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         await mockService.deleteProduct(productToDelete.id, productToDelete.image_url);
         await fetchProducts();
         setProductToDelete(null);
-      } catch (err) {
-        alert('Erro ao excluir.');
+      } catch (err: any) {
+        alert(err.message || 'Erro ao excluir item.');
       } finally {
         setLoading(false);
       }
     }
   };
 
-  if (!isAuthenticated) {
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-royal-blue flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-vibrant-yellow/20 border-t-vibrant-yellow rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // --- TELA DE LOGIN ---
+  if (!user) {
     return (
       <div className="min-h-screen bg-royal-blue flex flex-col items-center justify-center p-4">
-        <div className="w-20 h-20 bg-vibrant-yellow rounded-full flex items-center justify-center mb-8 shadow-2xl animate-bounce">
-           <i className="fas fa-key text-royal-blue text-3xl"></i>
+        <div className="w-20 h-20 bg-vibrant-yellow rounded-full flex items-center justify-center mb-8 shadow-2xl animate-pulse">
+           <i className="fas fa-lock text-royal-blue text-3xl"></i>
         </div>
         <form onSubmit={handleLogin} className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-sm w-full">
-          <h2 className="text-royal-blue text-3xl font-black mb-1 text-center italic tracking-tighter uppercase">Painel A.R</h2>
-          <p className="text-gray-400 text-[10px] text-center mb-8 font-black uppercase tracking-widest">Acesso Gestor Estufa</p>
+          <h2 className="text-royal-blue text-3xl font-black mb-1 text-center italic tracking-tighter uppercase">Admin A.R</h2>
+          <p className="text-gray-400 text-[10px] text-center mb-8 font-black uppercase tracking-widest">Acesso Exclusivo</p>
+          
           <div className="space-y-6">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Senha Mestra</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">E-mail</label>
+              <input 
+                type="email" 
+                placeholder="seu-email@exemplo.com" 
+                className="w-full bg-gray-50 border-2 border-gray-100 p-5 rounded-2xl focus:border-vibrant-yellow outline-none transition-all font-bold"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Senha</label>
               <input 
                 type="password" 
                 placeholder="••••••••" 
-                className="w-full bg-gray-50 border-2 border-gray-100 p-5 rounded-2xl focus:border-vibrant-yellow outline-none transition-all font-mono text-center text-xl tracking-[0.5em]"
+                className="w-full bg-gray-50 border-2 border-gray-100 p-5 rounded-2xl focus:border-vibrant-yellow outline-none transition-all font-bold"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoFocus
+                required
               />
             </div>
-            <button className="w-full bg-royal-blue text-white font-black py-5 rounded-2xl hover:bg-vibrant-yellow hover:text-royal-blue transition-all shadow-xl active:scale-95 uppercase tracking-widest">
-              Entrar no Sistema
+
+            {authError && (
+              <div className="bg-red-50 text-red-500 text-xs font-bold p-4 rounded-xl border border-red-100 flex items-center gap-3 animate-shake">
+                <i className="fas fa-exclamation-circle"></i>
+                {authError}
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={authLoading}
+              className="w-full bg-royal-blue text-white font-black py-5 rounded-2xl hover:bg-vibrant-yellow hover:text-royal-blue transition-all shadow-xl active:scale-95 uppercase tracking-widest flex items-center justify-center gap-3"
+            >
+              {authLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-sign-in-alt"></i>}
+              {authLoading ? 'Autenticando...' : 'Entrar no Sistema'}
             </button>
-            <button type="button" onClick={onBack} className="w-full text-gray-300 font-bold text-xs py-2 uppercase tracking-widest">
-              Sair para o Site
+            
+            <button type="button" onClick={onBack} className="w-full text-gray-300 font-bold text-xs py-2 uppercase tracking-widest hover:text-gray-500 transition-colors">
+              Voltar ao Site
             </button>
           </div>
         </form>
@@ -147,24 +259,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     );
   }
 
+  // --- PAINEL (Logado) ---
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <nav className="bg-white border-b-2 p-4 md:px-10 flex justify-between items-center sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-royal-blue rounded-2xl flex items-center justify-center border-2 border-vibrant-yellow rotate-3">
+          <div className="w-12 h-12 bg-royal-blue rounded-2xl flex items-center justify-center border-2 border-vibrant-yellow rotate-3 shadow-md">
             <span className="text-vibrant-yellow font-black text-lg">A.R</span>
           </div>
           <div>
             <h1 className="text-xl font-black text-royal-blue leading-none italic uppercase">Gestão de Estoque</h1>
-            <p className="text-[10px] text-gray-400 font-black tracking-widest uppercase">Database Realtime</p>
+            <p className="text-[10px] text-green-500 font-black tracking-widest uppercase flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Admin: {user.email}
+            </p>
           </div>
         </div>
         <div className="flex gap-4">
-          <button onClick={onBack} className="bg-gray-100 text-gray-500 px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-royal-blue hover:text-white transition-all">
-            Ver Site
+          <button onClick={onBack} className="hidden sm:block bg-gray-100 text-gray-500 px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-royal-blue hover:text-white transition-all">
+            Ir para o Site
           </button>
-          <button onClick={() => setIsAuthenticated(false)} className="bg-red-50 text-red-500 px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
-            Logout
+          <button onClick={handleLogout} className="bg-red-50 text-red-500 px-6 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-sm">
+            Sair
           </button>
         </div>
       </nav>
@@ -172,12 +288,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       <div className="flex-grow p-4 md:p-10 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           
-          {/* Cadastro de Novo Produto */}
+          {/* Formulário */}
           <div className="lg:col-span-4">
-            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 sticky top-28">
+            <div className={`bg-white p-8 rounded-[3rem] shadow-sm border-2 transition-colors sticky top-28 ${editingId ? 'border-vibrant-yellow' : 'border-gray-100'}`}>
               <h3 className="text-2xl font-black text-royal-blue mb-8 flex items-center gap-3 italic uppercase">
-                <i className="fas fa-plus-circle text-vibrant-yellow"></i>
-                Adicionar
+                <i className={`fas ${editingId ? 'fa-edit' : 'fa-plus-circle'} text-vibrant-yellow`}></i>
+                {editingId ? 'Editar Item' : 'Novo Item'}
               </h3>
               
               <div className="space-y-5">
@@ -187,14 +303,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                       <img src={imagePreview} className="w-full h-full object-contain p-4" alt="Preview" />
                     ) : (
                       <div className="text-center opacity-30">
-                        <i className="fas fa-camera text-5xl mb-3"></i>
-                        <p className="text-[10px] font-black uppercase tracking-widest">Escolher Foto</p>
+                        <i className="fas fa-image text-5xl mb-3"></i>
+                        <p className="text-[10px] font-black uppercase tracking-widest">Foto do Produto</p>
                       </div>
                     )}
                     <input type="file" id="file-upload" className="hidden" onChange={handleFileChange} accept="image/*" />
                     <label htmlFor="file-upload" className="absolute inset-0 cursor-pointer flex items-center justify-center opacity-0 group-hover:opacity-100 bg-royal-blue/80 transition-all">
                       <span className="bg-vibrant-yellow text-royal-blue px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
-                        {imagePreview ? 'Trocar Foto' : 'Subir Imagem'}
+                        Mudar Imagem
                       </span>
                     </label>
                   </div>
@@ -218,28 +334,38 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                     </div>
                     <input type="text" placeholder="PESO" className="admin-input w-32" value={weight} onChange={e => setWeight(e.target.value)} />
                   </div>
-                  <textarea placeholder="BREVE DESCRIÇÃO..." className="admin-input h-24 resize-none" value={description} onChange={e => setDescription(e.target.value)}></textarea>
+                  <textarea placeholder="DESCRIÇÃO..." className="admin-input h-24 resize-none" value={description} onChange={e => setDescription(e.target.value)}></textarea>
                 </div>
 
-                <button 
-                  onClick={handleSave}
-                  disabled={loading}
-                  className="w-full bg-royal-blue text-white font-black py-5 rounded-[1.5rem] shadow-xl hover:bg-vibrant-yellow hover:text-royal-blue transition-all disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
-                >
-                  {loading && <i className="fas fa-spinner fa-spin"></i>}
-                  {loading ? 'Sincronizando...' : 'Publicar Produto'}
-                </button>
+                <div className="flex gap-3">
+                  {editingId && (
+                    <button onClick={resetForm} className="flex-grow bg-gray-100 text-gray-400 font-black py-5 rounded-[1.5rem] uppercase tracking-widest text-xs">
+                      Cancelar
+                    </button>
+                  )}
+                  <button 
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="flex-[2] bg-royal-blue text-white font-black py-5 rounded-[1.5rem] shadow-xl hover:bg-vibrant-yellow hover:text-royal-blue transition-all disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
+                  >
+                    {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-check"></i>}
+                    {loading ? 'Salvando...' : (editingId ? 'Atualizar' : 'Publicar')}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Listagem de Produtos */}
+          {/* Listagem */}
           <div className="lg:col-span-8">
             <div className="bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-8 border-b flex justify-between items-center bg-gray-50/50">
                 <h3 className="text-xl font-black text-royal-blue uppercase italic tracking-tighter">
-                  Itens Cadastrados <span className="text-gray-300 ml-3 font-bold normal-case text-sm tracking-normal">({products.length})</span>
+                  Catálogo Atual <span className="text-gray-300 ml-3 font-bold normal-case text-sm">({products.length})</span>
                 </h3>
+                <button onClick={fetchProducts} className="text-royal-blue/30 hover:text-royal-blue transition-colors">
+                  <i className={`fas fa-sync-alt ${fetchLoading ? 'animate-spin' : ''}`}></i>
+                </button>
               </div>
               
               <div className="overflow-x-auto">
@@ -247,59 +373,61 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                   <thead className="bg-white text-gray-300 uppercase text-[10px] font-black tracking-[0.2em] border-b">
                     <tr>
                       <th className="px-8 py-6">Produto</th>
-                      <th className="px-6 py-6">Categoria</th>
+                      <th className="px-6 py-6">Tipo</th>
                       <th className="px-6 py-6">Preço</th>
                       <th className="px-8 py-6 text-center">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {fetchLoading ? (
+                    {fetchLoading && products.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="px-8 py-24 text-center">
-                          <div className="flex flex-col items-center">
-                            <div className="w-12 h-12 border-4 border-royal-blue/10 border-t-royal-blue rounded-full animate-spin"></div>
-                            <p className="mt-4 text-gray-400 font-black uppercase text-[10px] tracking-widest">Buscando do Supabase...</p>
-                          </div>
+                          <div className="w-10 h-10 border-4 border-royal-blue/10 border-t-royal-blue rounded-full animate-spin mx-auto mb-4"></div>
                         </td>
                       </tr>
                     ) : products.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="px-8 py-24 text-center">
-                          <i className="fas fa-box-open text-5xl text-gray-100 mb-4"></i>
-                          <p className="text-gray-400 font-bold italic">Estoque vazio. Comece a cadastrar!</p>
+                          <p className="text-gray-400 font-bold italic">Nenhum produto no catálogo.</p>
                         </td>
                       </tr>
                     ) : (
                       products.map(p => (
-                        <tr key={p.id} className="hover:bg-gray-50 transition-colors group">
+                        <tr key={p.id} className={`transition-colors group ${editingId === p.id ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                           <td className="px-8 py-5">
                             <div className="flex items-center gap-5">
-                              <img src={p.image_url} className="w-14 h-14 object-contain rounded-2xl bg-white border shadow-sm group-hover:scale-110 transition-transform" alt="" />
+                              <img src={p.image_url} className="w-14 h-14 object-contain rounded-2xl bg-white border shadow-sm" alt="" />
                               <div>
-                                <p className="font-black text-royal-blue leading-none uppercase tracking-tight">{p.name}</p>
-                                <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">{p.brand} {p.weight && `• ${p.weight}`}</p>
+                                <p className="font-black text-royal-blue leading-none uppercase truncate max-w-[200px]">{p.name}</p>
+                                <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">{p.brand} | {p.weight}</p>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-5">
-                            <span className={`text-[10px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest border ${
-                              p.category === 'Cachorro' ? 'bg-blue-50 text-blue-500 border-blue-100' :
-                              p.category === 'Gato' ? 'bg-purple-50 text-purple-500 border-purple-100' :
-                              'bg-orange-50 text-orange-500 border-orange-100'
-                            }`}>
+                            <span className="text-[10px] font-black px-3 py-1.5 rounded-xl uppercase border bg-blue-50 text-blue-500 border-blue-100">
                               {p.category}
                             </span>
                           </td>
                           <td className="px-6 py-5">
-                            <p className="font-black text-royal-blue text-lg tracking-tighter">R$ {p.price.toFixed(2)}</p>
+                            <p className="font-black text-royal-blue text-lg">R$ {p.price.toFixed(2)}</p>
                           </td>
                           <td className="px-8 py-5 text-center">
-                            <button 
-                              onClick={() => setProductToDelete(p)}
-                              className="w-11 h-11 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all inline-flex items-center justify-center shadow-sm"
-                            >
-                              <i className="fas fa-trash-alt"></i>
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button 
+                                onClick={() => startEdit(p)}
+                                className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all inline-flex items-center justify-center"
+                                title="Editar Preço/Dados"
+                              >
+                                <i className="fas fa-edit"></i>
+                              </button>
+                              <button 
+                                onClick={() => setProductToDelete(p)}
+                                className="w-10 h-10 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all inline-flex items-center justify-center"
+                                title="Excluir"
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -312,33 +440,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Modal Deleção Customizado */}
+      {/* Modal Deleção */}
       {productToDelete && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-royal-blue/80 backdrop-blur-md" onClick={() => !loading && setProductToDelete(null)}></div>
           <div className="relative bg-white w-full max-w-md rounded-[3rem] p-10 text-center shadow-2xl animate-scaleIn">
-            <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
-              <i className="fas fa-exclamation-circle text-4xl"></i>
+            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i className="fas fa-exclamation-triangle text-3xl"></i>
             </div>
-            <h2 className="text-3xl font-black text-royal-blue mb-3 uppercase italic tracking-tighter">Apagar Produto?</h2>
-            <p className="text-gray-500 mb-10 leading-relaxed font-medium">
-              Tem certeza que deseja remover <strong>{productToDelete.name}</strong>? Esta ação é irreversível no Supabase.
+            <h2 className="text-3xl font-black text-royal-blue mb-2 uppercase italic">Excluir?</h2>
+            <p className="text-gray-500 mb-8 font-medium">
+              Confirma a exclusão de <strong>{productToDelete.name}</strong>?
             </p>
             <div className="grid grid-cols-2 gap-4">
-              <button
-                disabled={loading}
-                onClick={() => setProductToDelete(null)}
-                className="bg-gray-100 text-gray-500 font-black py-5 rounded-2xl hover:bg-gray-200 transition-all uppercase tracking-widest text-xs"
-              >
+              <button disabled={loading} onClick={() => setProductToDelete(null)} className="bg-gray-100 text-gray-500 font-black py-4 rounded-2xl hover:bg-gray-200 transition-all uppercase text-xs">
                 Cancelar
               </button>
-              <button
-                disabled={loading}
-                onClick={handleConfirmDelete}
-                className="bg-red-500 text-white font-black py-5 rounded-2xl shadow-lg shadow-red-200 hover:bg-red-600 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
-              >
-                {loading && <i className="fas fa-spinner fa-spin"></i>}
-                {loading ? 'Removendo' : 'Confirmar'}
+              <button disabled={loading} onClick={handleConfirmDelete} className="bg-red-500 text-white font-black py-4 rounded-2xl hover:bg-red-600 transition-all flex items-center justify-center gap-2 uppercase text-xs">
+                {loading ? <i className="fas fa-spinner fa-spin"></i> : 'Excluir'}
               </button>
             </div>
           </div>
@@ -356,20 +475,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           font-size: 0.9rem;
           color: #002395;
           outline: none;
-          transition: all 0.3s;
+          transition: all 0.2s;
         }
-        .admin-input:focus {
-          border-color: #FFD700;
-          background: white;
-          box-shadow: 0 10px 20px -10px rgba(0,35,149,0.1);
-        }
+        .admin-input:focus { border-color: #FFD700; background: white; }
         .admin-input::placeholder { color: #d1d5db; font-weight: 800; }
-        
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.9); }
-          to { opacity: 1; transform: scale(1); }
-        }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.3s ease-in-out 2; }
       `}</style>
     </div>
   );

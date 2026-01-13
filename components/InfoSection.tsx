@@ -7,7 +7,7 @@ const InfoSection: React.FC = () => {
     {
       icon: 'fa-truck-fast',
       title: 'Entrega Rápida',
-      desc: 'Entregamos em toda a região do Km 40 e Campo Tiradentes.'
+      desc: 'Entregamos em toda a região do Km 40 próximo ao Campo Tiradentes.'
     },
     {
       icon: 'fa-award',

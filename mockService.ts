@@ -18,7 +18,7 @@ export const mockService = {
         if (data && data.length > 0) return data;
       }
     } catch (err) {
-      console.warn('Supabase fetch failed or not configured, falling back to local storage', err);
+      console.warn('Supabase fetch failed or not configured', err);
     }
 
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -57,7 +57,7 @@ export const mockService = {
 
       return data.publicUrl;
     } catch (err) {
-      console.error('Upload failed, returning base64', err);
+      console.error('Upload failed', err);
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -66,8 +66,8 @@ export const mockService = {
     }
   },
 
-  saveProduct: async (product: Omit<Product, 'id' | 'created_at'>, file?: File): Promise<Product> => {
-    let imageUrl = product.image_url;
+  saveProduct: async (productData: Omit<Product, 'id' | 'created_at'> & { id?: string }, file?: File): Promise<Product> => {
+    let imageUrl = productData.image_url;
 
     if (file) {
       imageUrl = await mockService.uploadImage(file);
@@ -75,29 +75,55 @@ export const mockService = {
 
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .insert([{ ...product, image_url: imageUrl }])
-          .select()
-          .single();
+        const payload = { ...productData, image_url: imageUrl };
         
-        if (error) throw error;
-        return data;
-      } catch (err) {
-        console.error('Supabase save failed', err);
+        let result;
+        if (productData.id) {
+          // UPDATE
+          const { data, error } = await supabase
+            .from('products')
+            .update(payload)
+            .eq('id', productData.id)
+            .select()
+            .single();
+          if (error) throw error;
+          result = data;
+        } else {
+          // INSERT
+          const { data, error } = await supabase
+            .from('products')
+            .insert([payload])
+            .select()
+            .single();
+          if (error) throw error;
+          result = data;
+        }
+        return result;
+      } catch (err: any) {
+        console.error('Supabase save failed:', err);
+        if (err.code === '42501' || err.status === 403) {
+          throw new Error('Acesso Negado: Você não tem permissão para modificar o banco de dados. Verifique se está logado como administrador.');
+        }
+        throw err;
       }
     }
 
     const products = await mockService.getProducts();
-    const newProduct: Product = {
-      ...product,
-      image_url: imageUrl,
-      id: Math.random().toString(36).substr(2, 9),
-      created_at: new Date().toISOString(),
-    };
-    const updated = [newProduct, ...products];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return newProduct;
+    if (productData.id) {
+      const updated = products.map(p => p.id === productData.id ? { ...p, ...productData, image_url: imageUrl } : p);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated.find(p => p.id === productData.id)!;
+    } else {
+      const newProduct: Product = {
+        ...productData,
+        image_url: imageUrl,
+        id: Math.random().toString(36).substr(2, 9),
+        created_at: new Date().toISOString(),
+      };
+      const updated = [newProduct, ...products];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return newProduct;
+    }
   },
 
   deleteProduct: async (id: string, imageUrl?: string): Promise<void> => {
@@ -118,8 +144,12 @@ export const mockService = {
         
         if (error) throw error;
         return;
-      } catch (err) {
-        console.error('Supabase delete failed', err);
+      } catch (err: any) {
+        console.error('Supabase delete failed:', err);
+        if (err.code === '42501' || err.status === 403) {
+          throw new Error('Acesso Negado: Você não tem permissão para excluir itens. Verifique o login.');
+        }
+        throw err;
       }
     }
 
