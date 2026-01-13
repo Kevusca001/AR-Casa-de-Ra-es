@@ -20,7 +20,6 @@
         .border-vibrant-yellow { border-color: #FFD700; }
         .bg-pet-red { background-color: #E60000; }
         
-        /* Previne que o clique em âncoras cause "pulos" visuais bruscos */
         :target {
             scroll-margin-top: 80px;
         }
@@ -38,5 +37,7 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
     <div id="root"></div>
+    <!-- Ponto de entrada do React para evitar tela branca -->
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>

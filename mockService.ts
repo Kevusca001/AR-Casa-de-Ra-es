@@ -18,7 +18,7 @@ export const mockService = {
         if (data && data.length > 0) return data;
       }
     } catch (err) {
-      console.warn('Supabase fetch failed, falling back to local storage', err);
+      console.warn('Supabase fetch failed or not configured, falling back to local storage', err);
     }
 
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -30,11 +30,9 @@ export const mockService = {
   },
 
   uploadImage: async (file: File | string): Promise<string> => {
-    // Se for string (base64 de fallback ou URL externa), retorna direto
     if (typeof file === 'string') return file;
 
     if (!isSupabaseConfigured()) {
-      // Fallback: Converte File para Base64 para salvar no localStorage
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -42,21 +40,30 @@ export const mockService = {
       });
     }
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `products/${fileName}`;
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `products/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('images')
-      .upload(filePath, file);
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file);
 
-    if (uploadError) throw uploadError;
+      if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage
-      .from('images')
-      .getPublicUrl(filePath);
+      const { data } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
 
-    return data.publicUrl;
+      return data.publicUrl;
+    } catch (err) {
+      console.error('Upload failed, returning base64', err);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
   },
 
   saveProduct: async (product: Omit<Product, 'id' | 'created_at'>, file?: File): Promise<Product> => {
@@ -81,7 +88,6 @@ export const mockService = {
       }
     }
 
-    // Fallback LocalStorage
     const products = await mockService.getProducts();
     const newProduct: Product = {
       ...product,
@@ -97,10 +103,10 @@ export const mockService = {
   deleteProduct: async (id: string, imageUrl?: string): Promise<void> => {
     if (isSupabaseConfigured()) {
       try {
-        // Tenta deletar a imagem do Storage se for uma URL do Supabase
-        if (imageUrl && imageUrl.includes('storage.googleapis.com')) {
-          const path = imageUrl.split('/public/images/')[1];
-          if (path) {
+        if (imageUrl && imageUrl.includes('storage')) {
+          const parts = imageUrl.split('/public/images/');
+          if (parts.length > 1) {
+            const path = parts[1];
             await supabase.storage.from('images').remove([path]);
           }
         }
