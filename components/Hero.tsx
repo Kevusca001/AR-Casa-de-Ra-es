@@ -37,29 +37,31 @@ const Hero: React.FC = () => {
           </h2>
           
           <p className="text-xl md:text-2xl text-white/80 font-medium max-w-3xl mx-auto leading-relaxed">
-            Referência em nutrição animal no Km 40 próximo ao Campo Tiradentes. <br className="hidden md:block" /> 
+            Referência em nutrição animal no Campo Lindo próximo ao Dom Bosco. <br className="hidden md:block" /> 
             Variedade, preço justo e a conveniência de pedir tudo pelo WhatsApp.
           </p>
           
-          <div className="flex flex-col sm:flex-row gap-6 pt-8 justify-center">
+          <div className="flex justify-center pt-8">
             <a 
-              href={`https://wa.me/${CONTACT.whatsapp}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-vibrant-yellow text-royal-blue px-10 py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-4 hover:bg-white hover:scale-105 transition-all shadow-2xl shadow-yellow-500/20 active:scale-95"
+              href="#catalogo"
+              onClick={(e) => handleNavClick(e, 'catalogo')}
+              className="bg-vibrant-yellow text-royal-blue px-12 py-6 rounded-3xl font-black text-2xl flex items-center justify-center transition-all shadow-2xl shadow-yellow-500/40 active:scale-95 animate-pulse-scale"
             >
-              <i className="fab fa-whatsapp text-3xl"></i>
               FAZER PEDIDO AGORA
             </a>
-            <button 
-              onClick={(e) => handleNavClick(e as any, 'catalogo')}
-              className="bg-transparent border-2 border-white/30 text-white px-10 py-5 rounded-2xl font-black text-xl hover:bg-white hover:text-royal-blue hover:border-white transition-all active:scale-95"
-            >
-              VER CATÁLOGO
-            </button>
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes pulse-scale {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.06); }
+        }
+        .animate-pulse-scale {
+          animation: pulse-scale 2s ease-in-out infinite;
+        }
+      `}</style>
     </section>
   );
 };

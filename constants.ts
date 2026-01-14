@@ -11,7 +11,7 @@ export const COLORS = {
 export const CONTACT = {
   whatsapp: '5521998703626',
   displayPhone: '(21) 99870-3626',
-  address: 'Campo Tiradentes | Centro km40 - Seropédica/RJ',
+  address: 'RUA RITA BATISTA 11A QD 14 LJ DOM BOSCO - CAMPO LINDO, SEROPÉDICA',
   instagram: '@ar_casaderacoes'
 };
 
