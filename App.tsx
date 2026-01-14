@@ -8,7 +8,7 @@ import Footer from './components/Footer';
 import AdminPanel from './components/AdminPanel';
 import Cart from './components/Cart';
 import { CartItem, Product } from './types';
-import { mockService } from './mockService';
+import { supabase } from './supabaseClient';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<'home' | 'admin'>('home');
@@ -20,10 +20,19 @@ function App() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const data = await mockService.getProducts();
-      setProducts(data);
+      // Chamada direta ao Supabase sem intermediários
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      
+      // Verificação de segurança para garantir que o array nunca seja nulo
+      setProducts(data || []);
     } catch (err) {
-      console.error('Failed to fetch products:', err);
+      console.error('Falha ao buscar produtos do banco:', err);
+      setProducts([]); // Fallback para array vazio em caso de erro
     } finally {
       setLoading(false);
     }

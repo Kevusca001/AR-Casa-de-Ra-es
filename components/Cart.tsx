@@ -17,7 +17,8 @@ const Cart: React.FC<CartProps> = ({ items, onClose, onUpdateQuantity, onClearCa
   const [neighborhood, setNeighborhood] = useState('');
   const [referencePoint, setReferencePoint] = useState('');
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // PROTEÇÃO: (item.price || 0) garante que o cálculo não resulte em NaN
+  const total = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
 
   // Validação: Nome, Rua e Bairro são obrigatórios
   const isAddressValid = customerName.trim().length > 2 && street.trim().length > 4 && neighborhood.trim().length > 2;
@@ -32,7 +33,7 @@ const Cart: React.FC<CartProps> = ({ items, onClose, onUpdateQuantity, onClearCa
 
     // Formatação da lista de itens
     const itemsText = items.map(item => 
-      `• ${item.quantity}x ${item.name} (${item.weight || 'N/A'}) - R$ ${(item.price * item.quantity).toFixed(2)}`
+      `• ${item.quantity}x ${item.name} (${item.weight || 'N/A'}) - R$ ${((item.price || 0) * item.quantity).toFixed(2)}`
     ).join('\n');
 
     // Montagem da mensagem com endereço no TOPO conforme solicitado pelo usuário
@@ -113,7 +114,8 @@ _Olá! Gostaria de confirmar meu pedido feito pelo site._`;
                       <img src={item.image_url} className="w-12 h-12 object-contain bg-gray-50 rounded-lg" alt="" />
                       <div className="flex-grow min-w-0">
                         <h4 className="font-bold text-royal-blue text-xs uppercase truncate">{item.name}</h4>
-                        <p className="text-[9px] text-pet-red font-black">R$ {(item.price * item.quantity).toFixed(2)}</p>
+                        {/* PROTEÇÃO: (item.price || 0) */}
+                        <p className="text-[9px] text-pet-red font-black">R$ {((item.price || 0) * item.quantity).toFixed(2)}</p>
                       </div>
                       <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
                         <button onClick={() => onUpdateQuantity(item.id, -1)} className="w-6 h-6 flex items-center justify-center text-xs"><i className="fas fa-minus"></i></button>

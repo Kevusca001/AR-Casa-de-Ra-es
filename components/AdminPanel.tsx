@@ -64,10 +64,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     if (!user) return;
     setFetchLoading(true);
     try {
-      const data = await mockService.getProducts();
-      setProducts(data);
+      // BUSCA DIRETA DO BANCO (TOTALMENTE INDEPENDENTE DE MOCK)
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('name', { ascending: true });
+      
+      if (error) throw error;
+      setProducts(data || []);
     } catch (err) {
-      console.error('Erro ao buscar produtos:', err);
+      console.error('Erro ao buscar produtos no banco:', err);
+      setProducts([]);
     } finally {
       setFetchLoading(false);
     }
@@ -125,7 +132,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     setEditingId(product.id);
     setName(product.name);
     setBrand(product.brand);
-    setPrice(product.price.toString().replace('.', ','));
+    setPrice((product.price || 0).toString().replace('.', ','));
     setCategory(product.category);
     setDescription(product.description);
     setWeight(product.weight || '');
@@ -155,22 +162,43 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     
     setLoading(true);
     try {
-      await mockService.saveProduct({
-        id: editingId || undefined,
+      let imageUrl = imagePreview || '';
+
+      if (selectedFile) {
+        imageUrl = await mockService.uploadImage(selectedFile);
+      }
+
+      const productData = {
         name,
         brand,
         description,
         category,
         weight,
         price: parseFloat(price.replace(',', '.')),
-        image_url: imagePreview || ''
-      }, selectedFile || undefined);
+        image_url: imageUrl
+      };
+
+      let resultError;
+      if (editingId) {
+        const { error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', editingId);
+        resultError = error;
+      } else {
+        const { error } = await supabase
+          .from('products')
+          .insert([productData]);
+        resultError = error;
+      }
+
+      if (resultError) throw resultError;
 
       await fetchProducts();
       resetForm();
       alert(editingId ? 'Produto atualizado!' : 'Produto cadastrado!');
     } catch (err: any) {
-      alert(err.message || 'Erro ao salvar. Verifique sua conexão ou permissões.');
+      alert(err.message || 'Erro ao salvar dados no banco.');
     } finally {
       setLoading(false);
     }
@@ -181,21 +209,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       const idToDelete = productToDelete.id;
       setLoading(true);
       setDeletingId(idToDelete);
-      try {
-        // --- CHAMADA DIRETA AO SUPABASE CONFORME SOLICITADO ---
-        const { error } = await supabase.from('products').delete().eq('id', idToDelete);
-        
-        if (error) throw error;
 
-        // Atualização Instantânea LOCAL: só ocorre se o banco confirmou (sem erro)
+      try {
+        // COMANDO DIRETO PARA O SUPABASE (SEM MOCKSERVICE)
+        const { error } = await supabase
+          .from('products')
+          .delete()
+          .eq('id', idToDelete);
+
+        if (error) {
+          console.error("Erro real do Supabase:", error);
+          throw new Error(`O banco recusou a exclusão: ${error.message}`);
+        }
+
+        // Tiramos da tela e sincronizamos
         setProducts(prev => prev.filter(p => p.id !== idToDelete));
-        
         setProductToDelete(null);
-        
-        // fetchProducts() removido para evitar efeito de 'ressurreição' e garantir paridade local instantânea
+        alert('Produto removido com sucesso!');
+
       } catch (err: any) {
-        console.error("Erro na exclusão direta:", err);
-        alert(err.message || 'Erro ao excluir item do banco de dados.');
+        console.error("Erro na exclusão:", err);
+        alert(err.message || 'Erro ao excluir item.');
       } finally {
         setLoading(false);
         setDeletingId(null);
@@ -211,7 +245,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     );
   }
 
-  // --- TELA DE LOGIN ---
   if (!user) {
     return (
       <div className="min-h-screen bg-royal-blue flex flex-col items-center justify-center p-4">
@@ -272,7 +305,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     );
   }
 
-  // --- PAINEL (Logado) ---
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <nav className="bg-white border-b-2 p-4 md:px-10 flex justify-between items-center sticky top-0 z-30 shadow-sm">
@@ -301,7 +333,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       <div className="flex-grow p-4 md:p-10 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           
-          {/* Formulário */}
           <div className="lg:col-span-4">
             <div className={`bg-white p-8 rounded-[3rem] shadow-sm border-2 transition-colors sticky top-28 ${editingId ? 'border-vibrant-yellow' : 'border-gray-100'}`}>
               <h3 className="text-2xl font-black text-royal-blue mb-8 flex items-center gap-3 italic uppercase">
@@ -369,7 +400,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Listagem */}
           <div className="lg:col-span-8">
             <div className="bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-8 border-b flex justify-between items-center bg-gray-50/50">
@@ -422,7 +452,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                             </span>
                           </td>
                           <td className="px-6 py-5">
-                            <p className="font-black text-royal-blue text-lg">R$ {p.price.toFixed(2)}</p>
+                            {/* PROTEÇÃO: (p.price || 0).toFixed(2) evita quebras se o valor for nulo no banco */}
+                            <p className="font-black text-royal-blue text-lg">R$ {(p.price || 0).toFixed(2)}</p>
                           </td>
                           <td className="px-8 py-5 text-center">
                             <div className="flex items-center justify-center gap-2">
@@ -432,18 +463,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                 </div>
                               ) : (
                                 <>
-                                  <button 
-                                    onClick={() => startEdit(p)}
-                                    className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all inline-flex items-center justify-center"
-                                    title="Editar Preço/Dados"
-                                  >
+                                  <button onClick={() => startEdit(p)} className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all inline-flex items-center justify-center">
                                     <i className="fas fa-edit"></i>
                                   </button>
-                                  <button 
-                                    onClick={() => setProductToDelete(p)}
-                                    className="w-10 h-10 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all inline-flex items-center justify-center"
-                                    title="Excluir"
-                                  >
+                                  <button onClick={() => setProductToDelete(p)} className="w-10 h-10 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all inline-flex items-center justify-center">
                                     <i className="fas fa-trash"></i>
                                   </button>
                                 </>
@@ -461,7 +484,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Modal Deleção */}
       {productToDelete && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-royal-blue/80 backdrop-blur-md" onClick={() => !loading && setProductToDelete(null)}></div>
@@ -502,12 +524,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         .admin-input::placeholder { color: #d1d5db; font-weight: 800; }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-        .animate-shake { animation: shake 0.3s ease-in-out 2; }
       `}</style>
     </div>
   );
