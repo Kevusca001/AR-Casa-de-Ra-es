@@ -12,7 +12,7 @@ interface ProductCatalogProps {
 const ProductCatalog: React.FC<ProductCatalogProps> = ({ products, onAddToCart, loading }) => {
   const [activeCategory, setActiveCategory] = useState<string>('Todos');
 
-  const categories = ['Todos', 'Cachorro', 'Gato', 'Aves'];
+  const categories = ['Todos', 'Rações', 'Medicamentos', 'Acessórios', 'Outros'];
 
   const filteredProducts = useMemo(() => {
     if (activeCategory === 'Todos') return products;
@@ -57,18 +57,26 @@ const ProductCatalog: React.FC<ProductCatalogProps> = ({ products, onAddToCart, 
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {filteredProducts.map(product => (
-              <div key={product.id} className="relative group animate-fadeInUp">
-                <ProductCard product={product} />
-                <button 
-                  onClick={() => onAddToCart(product)}
-                  className="absolute bottom-5 right-16 w-11 h-11 bg-vibrant-yellow text-royal-blue rounded-full flex items-center justify-center hover:scale-125 transition-all shadow-xl z-20 active:scale-95"
-                  title="Adicionar ao Carrinho"
-                >
-                  <i className="fas fa-plus text-lg"></i>
-                </button>
-              </div>
-            ))}
+            {filteredProducts.map(product => {
+              const isOutOfStock = (product.stock_quantity || 0) <= 0;
+              return (
+                <div key={product.id} className="relative group animate-fadeInUp">
+                  <ProductCard product={product} />
+                  <button 
+                    onClick={() => !isOutOfStock && onAddToCart(product)}
+                    disabled={isOutOfStock}
+                    className={`absolute bottom-5 right-16 w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xl z-20 ${
+                      isOutOfStock 
+                      ? 'bg-gray-400 text-white cursor-not-allowed opacity-50' 
+                      : 'bg-vibrant-yellow text-royal-blue hover:scale-125 active:scale-95'
+                    }`}
+                    title={isOutOfStock ? "Produto Esgotado" : "Adicionar ao Carrinho"}
+                  >
+                    <i className={`fas ${isOutOfStock ? 'fa-times' : 'fa-plus'} text-lg`}></i>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

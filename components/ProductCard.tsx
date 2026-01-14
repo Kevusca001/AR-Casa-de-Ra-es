@@ -7,8 +7,10 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+  const isOutOfStock = (product.stock_quantity || 0) <= 0;
+
   return (
-    <div className="bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all border border-gray-100 flex flex-col group h-full relative">
+    <div className={`bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all border border-gray-100 flex flex-col group h-full relative ${isOutOfStock ? 'opacity-75 grayscale-[0.5]' : ''}`}>
       <div className="relative aspect-square overflow-hidden bg-gray-50 flex items-center justify-center">
         <img 
           src={product.image_url} 
@@ -18,7 +20,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         
         {/* Badges Flutuantes */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-          {product.tag && (
+          {isOutOfStock ? (
+            <div className="bg-gray-800 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-xl shadow-lg border border-white/20">
+              Esgotado
+            </div>
+          ) : product.tag && (
             <div className="bg-pet-red text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-xl shadow-lg border border-white/20">
               {product.tag}
             </div>
@@ -27,6 +33,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             {product.category}
           </div>
         </div>
+
+        {isOutOfStock && (
+          <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] flex items-center justify-center z-10">
+             <span className="bg-royal-blue text-white px-6 py-2 rounded-full font-black text-xs uppercase tracking-widest rotate-[-5deg] shadow-2xl">Em breve</span>
+          </div>
+        )}
       </div>
 
       <div className="p-6 flex flex-col flex-grow">
@@ -48,10 +60,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                 <i className="fas fa-weight-hanging text-xs"></i> {product.weight}
               </span>
             )}
-            <div className="bg-vibrant-yellow px-4 py-2 rounded-2xl shadow-sm border border-black/5">
+            <div className={`px-4 py-2 rounded-2xl shadow-sm border border-black/5 ${isOutOfStock ? 'bg-gray-200' : 'bg-vibrant-yellow'}`}>
               <span className="text-royal-blue text-[11px] font-black mr-1 uppercase opacity-60">R$</span>
               <span className="text-royal-blue text-2xl font-black tracking-tighter">
-                {/* PROTEÇÃO: (product.price || 0) */}
                 {(product.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>

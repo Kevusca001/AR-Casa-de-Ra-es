@@ -28,12 +28,13 @@ export const PRODUCTS_DATA: Product[] = [
     brand: 'Zoetis',
     name: 'Simparic 20mg',
     description: 'Proteção contra pulgas, carrapatos e sarnas.',
-    price: 0, // Price was not explicitly in this specific image tag, but highlighted as "Entrega Grátis"
+    price: 0,
     weight: '1 comprimido',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
+    category: 'Medicamentos',
     image_url: 'https://images.tcdn.com.br/img/editor/up/1063665/Simparic20mg.png',
-    tag: 'Entrega Grátis'
+    tag: 'Entrega Grátis',
+    // Added missing stock_quantity
+    stock_quantity: 10
   },
   {
     id: '2',
@@ -42,10 +43,11 @@ export const PRODUCTS_DATA: Product[] = [
     description: 'Cachorros Adultos - Todas as raças.',
     price: 155.90,
     weight: '15kg-20kg',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
+    category: 'Rações',
     image_url: 'https://picsum.photos/seed/quatree1/400/400',
-    tag: 'Destaque'
+    tag: 'Destaque',
+    // Added missing stock_quantity
+    stock_quantity: 5
   },
   {
     id: '3',
@@ -54,9 +56,10 @@ export const PRODUCTS_DATA: Product[] = [
     description: 'Milho em grão de alta qualidade.',
     price: 32.00,
     weight: '15kg',
-    category: 'Aves',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/milho/400/400'
+    category: 'Rações',
+    image_url: 'https://picsum.photos/seed/milho/400/400',
+    // Added missing stock_quantity
+    stock_quantity: 20
   },
   {
     id: '4',
@@ -65,96 +68,9 @@ export const PRODUCTS_DATA: Product[] = [
     description: 'Alimento completo para cães adultos.',
     price: 58.00,
     weight: '15kg',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/westdog/400/400'
-  },
-  {
-    id: '5',
-    brand: 'Canister',
-    name: 'Canister Premium Original',
-    description: 'Cachorros Adultos - Alta performance.',
-    price: 69.99,
-    weight: '15kg',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/canister/400/400'
-  },
-  {
-    id: '6',
-    brand: 'Goldog',
-    name: 'Goldog Premium Carne e Ossinhos',
-    description: 'Cachorros Adultos - Proteína hidrolisada.',
-    price: 85.90,
-    weight: '15kg',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/goldog/400/400'
-  },
-  {
-    id: '7',
-    brand: 'Quatree Gourmet',
-    name: 'Gatos Castrados Mix Carnes',
-    description: '4 fontes de proteínas de origem animal.',
-    price: 174.90,
-    weight: '10kg',
-    category: 'Gato',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/quatreegourmet/400/400'
-  },
-  {
-    id: '8',
-    brand: 'Quatree Gourmet',
-    name: 'Gatos Castrados Delícias do Mar',
-    description: 'Sabor Salmão e Peixe Branco.',
-    price: 149.90,
-    weight: '10kg',
-    category: 'Gato',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/quatreeocean/400/400'
-  },
-  {
-    id: '9',
-    brand: 'Toro',
-    name: 'Toro Adultos',
-    description: 'Ração econômica de qualidade.',
-    price: 74.90,
-    weight: '15kg',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/toro/400/400'
-  },
-  {
-    id: '10',
-    brand: 'Avatar',
-    name: 'Avatar Carne',
-    description: 'Cachorros Adultos - Sabor Carne.',
-    price: 79.90,
-    weight: '15kg',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/avatar/400/400'
-  },
-  {
-    id: '11',
-    brand: 'Papa Tudo',
-    name: 'Papa Tudo Mix',
-    description: 'Cachorros Adultos - Mix de sabores.',
-    price: 78.90,
-    weight: '15kg',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/papatudo1/400/400'
-  },
-  {
-    id: '12',
-    brand: 'Papa Tudo',
-    name: 'Papa Tudo Original',
-    description: 'Cachorros Adultos - Formulação original.',
-    price: 75.90,
-    weight: '15kg',
-    category: 'Cachorro',
-    // Fix: Changed imageUrl to image_url
-    image_url: 'https://picsum.photos/seed/papatudo2/400/400'
+    category: 'Rações',
+    image_url: 'https://picsum.photos/seed/westdog/400/400',
+    // Added missing stock_quantity
+    stock_quantity: 8
   }
 ];

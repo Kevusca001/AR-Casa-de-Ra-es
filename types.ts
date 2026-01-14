@@ -7,8 +7,9 @@ export interface Product {
   price: number;
   weight?: string;
   category: string;
-  image_url: string; // Armazenará URL ou Base64
+  image_url: string; 
   tag?: string;
+  stock_quantity: number; // Novo campo para controle de estoque
   created_at?: string;
 }
 
