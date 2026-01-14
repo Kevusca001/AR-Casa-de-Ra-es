@@ -37,7 +37,7 @@ const Hero: React.FC = () => {
           </h2>
           
           <p className="text-xl md:text-2xl text-white/80 font-medium max-w-3xl mx-auto leading-relaxed">
-            Referência em nutrição animal no Km 40 e Campo Tiradentes. <br className="hidden md:block" /> 
+            Referência em nutrição animal no Km 40 próximo ao Campo Tiradentes. <br className="hidden md:block" /> 
             Variedade, preço justo e a conveniência de pedir tudo pelo WhatsApp.
           </p>
           
