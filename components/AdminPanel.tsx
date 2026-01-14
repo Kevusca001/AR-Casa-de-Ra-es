@@ -22,6 +22,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   
   // --- Estados do Formulário ---
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -177,15 +178,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
 
   const handleConfirmDelete = async () => {
     if (productToDelete) {
+      const idToDelete = productToDelete.id;
       setLoading(true);
+      setDeletingId(idToDelete);
       try {
-        await mockService.deleteProduct(productToDelete.id, productToDelete.image_url);
-        await fetchProducts();
+        // --- CHAMADA DIRETA AO SUPABASE CONFORME SOLICITADO ---
+        const { error } = await supabase.from('products').delete().eq('id', idToDelete);
+        
+        if (error) throw error;
+
+        // Atualização Instantânea LOCAL: só ocorre se o banco confirmou (sem erro)
+        setProducts(prev => prev.filter(p => p.id !== idToDelete));
+        
         setProductToDelete(null);
+        
+        // fetchProducts() removido para evitar efeito de 'ressurreição' e garantir paridade local instantânea
       } catch (err: any) {
-        alert(err.message || 'Erro ao excluir item.');
+        console.error("Erro na exclusão direta:", err);
+        alert(err.message || 'Erro ao excluir item do banco de dados.');
       } finally {
         setLoading(false);
+        setDeletingId(null);
       }
     }
   };
@@ -393,7 +406,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                       </tr>
                     ) : (
                       products.map(p => (
-                        <tr key={p.id} className={`transition-colors group ${editingId === p.id ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                        <tr key={p.id} className={`transition-all group ${editingId === p.id ? 'bg-yellow-50' : 'hover:bg-gray-50'} ${deletingId === p.id ? 'opacity-30' : ''}`}>
                           <td className="px-8 py-5">
                             <div className="flex items-center gap-5">
                               <img src={p.image_url} className="w-14 h-14 object-contain rounded-2xl bg-white border shadow-sm" alt="" />
@@ -413,20 +426,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                           </td>
                           <td className="px-8 py-5 text-center">
                             <div className="flex items-center justify-center gap-2">
-                              <button 
-                                onClick={() => startEdit(p)}
-                                className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all inline-flex items-center justify-center"
-                                title="Editar Preço/Dados"
-                              >
-                                <i className="fas fa-edit"></i>
-                              </button>
-                              <button 
-                                onClick={() => setProductToDelete(p)}
-                                className="w-10 h-10 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all inline-flex items-center justify-center"
-                                title="Excluir"
-                              >
-                                <i className="fas fa-trash"></i>
-                              </button>
+                              {deletingId === p.id ? (
+                                <div className="w-10 h-10 flex items-center justify-center text-red-500">
+                                  <i className="fas fa-spinner fa-spin"></i>
+                                </div>
+                              ) : (
+                                <>
+                                  <button 
+                                    onClick={() => startEdit(p)}
+                                    className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all inline-flex items-center justify-center"
+                                    title="Editar Preço/Dados"
+                                  >
+                                    <i className="fas fa-edit"></i>
+                                  </button>
+                                  <button 
+                                    onClick={() => setProductToDelete(p)}
+                                    className="w-10 h-10 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all inline-flex items-center justify-center"
+                                    title="Excluir"
+                                  >
+                                    <i className="fas fa-trash"></i>
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>

@@ -12,7 +12,7 @@ export const mockService = {
         const { data, error } = await supabase
           .from('products')
           .select('*')
-          .order('created_at', { ascending: false });
+          .order('name', { ascending: true });
         
         if (error) throw error;
         if (data && data.length > 0) return data;
@@ -79,7 +79,6 @@ export const mockService = {
         
         let result;
         if (productData.id) {
-          // UPDATE
           const { data, error } = await supabase
             .from('products')
             .update(payload)
@@ -89,7 +88,6 @@ export const mockService = {
           if (error) throw error;
           result = data;
         } else {
-          // INSERT
           const { data, error } = await supabase
             .from('products')
             .insert([payload])
@@ -100,9 +98,9 @@ export const mockService = {
         }
         return result;
       } catch (err: any) {
-        console.error('Supabase save failed:', err);
+        console.error('Erro ao salvar no Supabase:', err);
         if (err.code === '42501' || err.status === 403) {
-          throw new Error('Acesso Negado: Você não tem permissão para modificar o banco de dados. Verifique se está logado como administrador.');
+          throw new Error('Acesso Negado: Verifique se sua conta tem permissão de escrita no Supabase (RLS).');
         }
         throw err;
       }
@@ -127,32 +125,7 @@ export const mockService = {
   },
 
   deleteProduct: async (id: string, imageUrl?: string): Promise<void> => {
-    if (isSupabaseConfigured()) {
-      try {
-        if (imageUrl && imageUrl.includes('storage')) {
-          const parts = imageUrl.split('/public/images/');
-          if (parts.length > 1) {
-            const path = parts[1];
-            await supabase.storage.from('images').remove([path]);
-          }
-        }
-
-        const { error } = await supabase
-          .from('products')
-          .delete()
-          .eq('id', id);
-        
-        if (error) throw error;
-        return;
-      } catch (err: any) {
-        console.error('Supabase delete failed:', err);
-        if (err.code === '42501' || err.status === 403) {
-          throw new Error('Acesso Negado: Você não tem permissão para excluir itens. Verifique o login.');
-        }
-        throw err;
-      }
-    }
-
+    // Mantido para fallback local, a exclusão do Supabase agora é direta no AdminPanel
     const products = await mockService.getProducts();
     const updated = products.filter(p => p.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));

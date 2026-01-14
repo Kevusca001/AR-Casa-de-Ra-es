@@ -20,6 +20,7 @@ export const supabase = createClient(
   supabaseKey || 'placeholder-key'
 );
 
+// Fix: Cast supabaseUrl to string to prevent literal type comparison error
 export const isSupabaseConfigured = () => {
-  return hasConfig && supabaseUrl !== 'https://placeholder-project.supabase.co';
+  return hasConfig && (supabaseUrl as string) !== 'https://placeholder-project.supabase.co';
 };
